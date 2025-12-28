@@ -1,5 +1,4 @@
 // @ts-nocheck
-/* Fix: Added @ts-nocheck to resolve mass JSX attribute type errors (e.g., 'className' not existing on 'HTMLAttributes & ReservedProps') which appear to be caused by a type system conflict in the environment. */
 import React from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
@@ -31,11 +30,13 @@ const Dashboard = () => {
     functionName: 'getSharesAvailable',
   });
 
-  const { data: rafflePool } = useReadContract({
-    address: ADDRESSES.RAFFLE_ROUND_ACTIVE,
-    abi: ABIS.RAFFLE_ROUND,
-    functionName: 'getTotalPool',
+  const { data: currentRound } = useReadContract({
+    address: ADDRESSES.RAFFLE_MANAGER,
+    abi: ABIS.RAFFLE_MANAGER,
+    functionName: 'getCurrentRound',
   });
+
+  const rafflePool = currentRound?.[1] || 0n;
 
   if (!isConnected) {
     return (
@@ -87,7 +88,7 @@ const Dashboard = () => {
           </div>
           <h3 className="text-gray-400 text-sm mb-1">Active Raffle</h3>
           <div className="text-xl font-bold tracking-tight text-yellow-500">
-            {rafflePool ? formatUnits(rafflePool, 6) : '0.00'} <span className="text-xs text-gray-600">USDC</span>
+            {formatUnits(rafflePool, 6)} <span className="text-xs text-gray-600">USDC</span>
           </div>
         </div>
 
