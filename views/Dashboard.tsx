@@ -1,5 +1,4 @@
 // @ts-nocheck
-/* Fix: Added @ts-nocheck to resolve mass JSX attribute type errors (e.g., 'className' not existing on 'HTMLAttributes & ReservedProps') which appear to be caused by a type system conflict in the environment. */
 import React from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
@@ -35,11 +34,13 @@ const Dashboard = () => {
     functionName: 'getSharesAvailable',
   });
 
-  const { data: rafflePool } = useReadContract({
-    address: ADDRESSES.RAFFLE_ROUND_ACTIVE,
-    abi: ABIS.RAFFLE_ROUND,
-    functionName: 'getTotalPool',
+  const { data: currentRound } = useReadContract({
+    address: ADDRESSES.RAFFLE_MANAGER,
+    abi: ABIS.RAFFLE_MANAGER,
+    functionName: 'getCurrentRound',
   });
+
+  const rafflePool = currentRound?.[1] || 0n;
 
   if (!isConnected) {
     return (
@@ -56,7 +57,6 @@ const Dashboard = () => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* User Card */}
         <div className="bg-[#111] p-6 rounded-3xl border border-gray-800 shadow-sm hover:border-blue-500/30 transition-all">
           <div className="flex justify-between items-start mb-4">
             <div className="p-3 bg-blue-500/10 rounded-2xl">
@@ -70,7 +70,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Balance Card */}
         <div className="bg-[#111] p-6 rounded-3xl border border-gray-800 shadow-sm hover:border-green-500/30 transition-all">
           <div className="flex justify-between items-start mb-4">
             <div className="p-3 bg-green-500/10 rounded-2xl">
@@ -84,7 +83,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Raffle Pool Card */}
         <div className="bg-[#111] p-6 rounded-3xl border border-gray-800 shadow-sm border-yellow-500/20 hover:border-yellow-500/40 transition-all">
           <div className="flex justify-between items-start mb-4">
             <div className="p-3 bg-yellow-500/10 rounded-2xl">
@@ -94,11 +92,10 @@ const Dashboard = () => {
           </div>
           <h3 className="text-gray-400 text-sm mb-1">Active Raffle</h3>
           <div className="text-xl font-bold tracking-tight text-yellow-500">
-            {rafflePool ? formatUnits(rafflePool, 6) : '0.00'} <span className="text-xs text-gray-600">USDC</span>
+            {formatUnits(rafflePool, 6)} <span className="text-xs text-gray-600">USDC</span>
           </div>
         </div>
 
-        {/* Shares Card */}
         <div className="bg-[#111] p-6 rounded-3xl border border-gray-800 shadow-sm hover:border-purple-500/30 transition-all">
           <div className="flex justify-between items-start mb-4">
             <div className="p-3 bg-purple-500/10 rounded-2xl">
@@ -112,7 +109,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Protocol Banner */}
       <div className="bg-gradient-to-br from-blue-600 to-purple-600 p-10 rounded-[2.5rem] text-white relative overflow-hidden shadow-2xl">
         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           <div>
@@ -137,7 +133,6 @@ const Dashboard = () => {
              </div>
           </div>
         </div>
-        {/* Decor */}
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/5 rounded-full -mr-40 -mt-40 blur-[100px]" />
       </div>
     </div>
