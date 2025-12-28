@@ -36,7 +36,6 @@ const RaffleView = () => {
   const [ticketAmount, setTicketAmount] = useState('1');
   const [timeData, setTimeData] = useState({ h: '00', m: '00', s: '00' });
 
-  // Usar getCurrentRound do RaffleManager
   const { data: currentRound, refetch: refetchRound } = useReadContract({
     address: ADDRESSES.RAFFLE_MANAGER,
     abi: ABIS.RAFFLE_MANAGER,
@@ -59,7 +58,6 @@ const RaffleView = () => {
   const { writeContract, data: txHash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
-  // Extrair dados do currentRound
   const endTime = currentRound?.[2];
   const totalPool = currentRound?.[1] || 0n;
   const totalTickets = currentRound?.[4];
@@ -99,9 +97,7 @@ const RaffleView = () => {
   return (
     <div className="space-y-16 md:space-y-24">
       
-      {/* SEÇÃO PRINCIPAL: THE GOLDEN POOL */}
       <section className="relative text-center">
-        {/* Background Aura */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[600px] -z-10 pointer-events-none">
           <div className="absolute inset-0 bg-yellow-500/10 blur-[150px] rounded-full animate-pulse" />
         </div>
@@ -143,7 +139,6 @@ const RaffleView = () => {
         </div>
       </section>
 
-      {/* PAINEL DE CONTROLE */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-2 md:px-0">
         <div className="lg:col-span-8 bg-[#0a0a0a] border border-white/5 rounded-[3rem] p-6 md:p-12 shadow-2xl overflow-hidden relative group">
           <div className="relative z-10 flex flex-col md:flex-row gap-12">
@@ -194,7 +189,6 @@ const RaffleView = () => {
                </div>
             </div>
           </div>
-          {/* Animated Glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 blur-[100px] rounded-full group-hover:bg-yellow-500/10 transition-colors" />
         </div>
 
