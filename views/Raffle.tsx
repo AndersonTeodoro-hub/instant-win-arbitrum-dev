@@ -1,8 +1,6 @@
 // @ts-nocheck
-/* Fix: Added @ts-nocheck to resolve mass JSX attribute type errors (e.g., 'className' not existing on 'HTMLAttributes & ReservedProps') which appear to be caused by a type system conflict in the environment. */
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-// Import arbitrum chain for explicit inclusion in writeContract calls
 import { arbitrum } from 'wagmi/chains';
 import { formatUnits } from 'viem';
 import { ADDRESSES, ABIS } from '../constants';
@@ -38,39 +36,34 @@ const RaffleView = () => {
   const [ticketAmount, setTicketAmount] = useState('1');
   const [timeData, setTimeData] = useState({ h: '00', m: '00', s: '00' });
 
-  const { data: endTime } = useReadContract({
-    address: ADDRESSES.RAFFLE_ROUND_ACTIVE,
-    abi: ABIS.RAFFLE_ROUND,
-    functionName: 'endTime',
+  // Usar getCurrentRound do RaffleManager
+  const { data: currentRound, refetch: refetchRound } = useReadContract({
+    address: ADDRESSES.RAFFLE_MANAGER,
+    abi: ABIS.RAFFLE_MANAGER,
+    functionName: 'getCurrentRound',
   });
 
   const { data: ticketPrice } = useReadContract({
-    address: ADDRESSES.RAFFLE_ROUND_ACTIVE,
-    abi: ABIS.RAFFLE_ROUND,
-    functionName: 'ticketPrice',
-  });
-
-  const { data: totalPool, refetch: refetchPool } = useReadContract({
-    address: ADDRESSES.RAFFLE_ROUND_ACTIVE,
-    abi: ABIS.RAFFLE_ROUND,
-    functionName: 'getTotalPool',
-  });
-
-  const { data: totalTickets, refetch: refetchTickets } = useReadContract({
-    address: ADDRESSES.RAFFLE_ROUND_ACTIVE,
-    abi: ABIS.RAFFLE_ROUND,
-    functionName: 'getTotalTickets',
+    address: ADDRESSES.RAFFLE_MANAGER,
+    abi: ABIS.RAFFLE_MANAGER,
+    functionName: 'TICKET_PRICE',
   });
 
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: ADDRESSES.USDC,
     abi: ABIS.USDC,
     functionName: 'allowance',
-    args: address ? [address, ADDRESSES.RAFFLE_ROUND_ACTIVE] : undefined,
+    args: address ? [address, ADDRESSES.RAFFLE_MANAGER] : undefined,
   });
 
   const { writeContract, data: txHash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+
+  // Extrair dados do currentRound
+  const endTime = currentRound?.[2];
+  const totalPool = currentRound?.[1] || 0n;
+  const totalTickets = currentRound?.[4];
+  const isActive = currentRound?.[5];
 
   useEffect(() => {
     if (!endTime) return;
@@ -92,15 +85,14 @@ const RaffleView = () => {
 
   useEffect(() => {
     if (isSuccess) {
-      refetchPool();
-      refetchTickets();
+      refetchRound();
       refetchAllowance();
     }
   }, [isSuccess]);
 
   const prizePool = totalPool || 0n;
   const splits = useMemo(() => calculatePrizeSplit(prizePool), [prizePool]);
-  const currentTicketPrice = ticketPrice || 10_000_000n; 
+  const currentTicketPrice = ticketPrice || 1_000000n; 
   const amountToPay = BigInt(parseInt(ticketAmount || '0')) * currentTicketPrice;
   const needsApproval = (allowance || 0n) < amountToPay;
 
@@ -214,7 +206,7 @@ const RaffleView = () => {
               <div className="space-y-4">
                  <ActivityRow label="Network" value="Arbitrum One" />
                  <ActivityRow label="Security" value="Chainlink VRF" />
-                 <ActivityRow label="Frequency" value="Every 24h" />
+                 <ActivityRow label="Frequency" value="Every 30min" />
               </div>
            </div>
            
@@ -222,7 +214,7 @@ const RaffleView = () => {
               <ShieldCheck className="text-blue-500 mb-4" size={40} />
               <h4 className="text-lg font-black uppercase mb-2 leading-tight">Provably Fair</h4>
               <p className="text-xs text-gray-500 mb-6">Todos os resultados são gerados on-chain com criptografia verificável.</p>
-              <a href={`https://arbiscan.io/address/${ADDRESSES.RAFFLE_ROUND_ACTIVE}`} target="_blank" className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">
+              <a href={`https://arbiscan.io/address/${ADDRESSES.RAFFLE_MANAGER}`} target="_blank" className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">
                  Verify Contract <ExternalLink size={12} />
               </a>
            </div>
@@ -237,7 +229,7 @@ const RaffleView = () => {
       address: ADDRESSES.USDC,
       abi: ABIS.USDC,
       functionName: 'approve',
-      args: [ADDRESSES.RAFFLE_ROUND_ACTIVE, BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")],
+      args: [ADDRESSES.RAFFLE_MANAGER, BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")],
       account: address,
       chain: arbitrum,
     });
@@ -246,8 +238,8 @@ const RaffleView = () => {
   function handleBuyTickets() {
     if (!ticketAmount || parseInt(ticketAmount) <= 0 || !address) return;
     writeContract({
-      address: ADDRESSES.RAFFLE_ROUND_ACTIVE,
-      abi: ABIS.RAFFLE_ROUND,
+      address: ADDRESSES.RAFFLE_MANAGER,
+      abi: ABIS.RAFFLE_MANAGER,
       functionName: 'buyTickets',
       args: [BigInt(ticketAmount)],
       account: address,
