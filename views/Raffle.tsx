@@ -5,7 +5,7 @@ import { arbitrum } from 'wagmi/chains';
 import { formatUnits } from 'viem';
 import { ADDRESSES, ABIS } from '../constants';
 import { calculatePrizeSplit } from '../utils/prizeSplit';
-import { Trophy, Clock, Ticket, ShieldCheck, Info, ChevronRight, CheckCircle, Zap, Activity, Globe, Loader2, ExternalLink } from 'lucide-react';
+import { Clock, Ticket, ShieldCheck, CheckCircle, Zap, Activity, Loader2, ExternalLink } from 'lucide-react';
 
 const AnimatedNumber = ({ value }: { value: string }) => {
   const [displayValue, setDisplayValue] = useState(0);
@@ -15,7 +15,7 @@ const AnimatedNumber = ({ value }: { value: string }) => {
     let start = displayValue;
     const end = target;
     if (start === end) return;
-    const duration = 1200; 
+    const duration = 1200;
     const startTime = performance.now();
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
@@ -30,6 +30,20 @@ const AnimatedNumber = ({ value }: { value: string }) => {
 
   return <span>{displayValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
 };
+
+const PrizeMiniRow = ({ label, value, color }: { label: string; value: string; color: string }) => (
+  <div className="flex flex-col">
+    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">{label}</span>
+    <span className={`font-mono text-xs font-bold ${color}`}>{value} USDC</span>
+  </div>
+);
+
+const ActivityRow = ({ label, value }: { label: string; value: string }) => (
+  <div className="flex justify-between items-center text-[10px] font-bold">
+    <span className="text-gray-500 uppercase tracking-widest">{label}</span>
+    <span className="text-gray-300">{value}</span>
+  </div>
+);
 
 const RaffleView = () => {
   const { address } = useAccount();
@@ -61,7 +75,6 @@ const RaffleView = () => {
   const endTime = currentRound?.[2];
   const totalPool = currentRound?.[1] || 0n;
   const totalTickets = currentRound?.[4];
-  const isActive = currentRound?.[5];
 
   useEffect(() => {
     if (!endTime) return;
@@ -70,7 +83,6 @@ const RaffleView = () => {
       const diff = Number(endTime) - now;
       if (diff <= 0) {
         setTimeData({ h: '00', m: '00', s: '00' });
-        clearInterval(interval);
       } else {
         const h = Math.floor(diff / 3600).toString().padStart(2, '0');
         const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
@@ -86,17 +98,40 @@ const RaffleView = () => {
       refetchRound();
       refetchAllowance();
     }
-  }, [isSuccess]);
+  }, [isSuccess, refetchRound, refetchAllowance]);
 
   const prizePool = totalPool || 0n;
   const splits = useMemo(() => calculatePrizeSplit(prizePool), [prizePool]);
-  const currentTicketPrice = ticketPrice || 1_000000n; 
+  const currentTicketPrice = ticketPrice || 1_000000n;
   const amountToPay = BigInt(parseInt(ticketAmount || '0')) * currentTicketPrice;
   const needsApproval = (allowance || 0n) < amountToPay;
 
+  const handleApprove = () => {
+    if (!address) return;
+    writeContract({
+      address: ADDRESSES.USDC,
+      abi: ABIS.USDC,
+      functionName: 'approve',
+      args: [ADDRESSES.RAFFLE_MANAGER, BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")],
+      account: address,
+      chain: arbitrum,
+    });
+  };
+
+  const handleBuyTickets = () => {
+    if (!ticketAmount || parseInt(ticketAmount) <= 0 || !address) return;
+    writeContract({
+      address: ADDRESSES.RAFFLE_MANAGER,
+      abi: ABIS.RAFFLE_MANAGER,
+      functionName: 'buyTickets',
+      args: [BigInt(ticketAmount)],
+      account: address,
+      chain: arbitrum,
+    });
+  };
+
   return (
     <div className="space-y-16 md:space-y-24">
-      
       <section className="relative text-center">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[600px] -z-10 pointer-events-none">
           <div className="absolute inset-0 bg-yellow-500/10 blur-[150px] rounded-full animate-pulse" />
@@ -111,7 +146,7 @@ const RaffleView = () => {
         </div>
 
         <h2 className="text-gray-500 font-bold uppercase tracking-[0.3em] text-[10px] md:text-xs mb-4">Current Prize Pool</h2>
-        
+
         <div className="relative inline-block px-4">
           <h1 className="text-[15vw] md:text-[120px] font-black leading-none tracking-tighter text-white">
             <AnimatedNumber value={formatUnits(prizePool, 6)} />
@@ -150,9 +185,9 @@ const RaffleView = () => {
                     <span>Amount</span>
                     <span>Cost: {formatUnits(amountToPay, 6)} USDC</span>
                   </div>
-                  <input 
-                    type="number" 
-                    value={ticketAmount} 
+                  <input
+                    type="number"
+                    value={ticketAmount}
                     onChange={(e: any) => setTicketAmount(e.target.value)}
                     className="w-full bg-transparent text-5xl md:text-7xl font-black border-none focus:ring-0 p-0 text-white placeholder:text-gray-800"
                     min="1"
@@ -165,95 +200,70 @@ const RaffleView = () => {
                   <CheckCircle size={28} /> TICKETS SECURED!
                 </div>
               ) : needsApproval ? (
-                <button onClick={handleApprove} disabled={isPending || isConfirming} className="w-full bg-blue-600 text-white py-6 md:py-8 rounded-[2rem] font-black text-xl md:text-2xl hover:bg-blue-500 transition-all flex items-center justify-center gap-3 shadow-[0_20px_40px_rgba(37,99,235,0.2)]">
-                  { (isPending || isConfirming) ? <Loader2 className="animate-spin" /> : <ShieldCheck size={28} />}
+                <button
+                  onClick={handleApprove}
+                  disabled={isPending || isConfirming}
+                  className="w-full bg-blue-600 text-white py-6 md:py-8 rounded-[2rem] font-black text-xl md:text-2xl hover:bg-blue-500 transition-all flex items-center justify-center gap-3 shadow-[0_20px_40px_rgba(37,99,235,0.2)]"
+                >
+                  {(isPending || isConfirming) ? <Loader2 className="animate-spin" /> : <ShieldCheck size={28} />}
                   APPROVE USDC
                 </button>
               ) : (
-                <button onClick={handleBuyTickets} disabled={isPending || isConfirming} className="w-full bg-yellow-500 text-black py-6 md:py-8 rounded-[2rem] font-black text-xl md:text-2xl hover:bg-yellow-400 transition-all flex items-center justify-center gap-3 shadow-[0_20px_40px_rgba(234,179,8,0.2)]">
-                  { (isPending || isConfirming) ? <Loader2 className="animate-spin" /> : <Zap size={28} />}
+                <button
+                  onClick={handleBuyTickets}
+                  disabled={isPending || isConfirming}
+                  className="w-full bg-yellow-500 text-black py-6 md:py-8 rounded-[2rem] font-black text-xl md:text-2xl hover:bg-yellow-400 transition-all flex items-center justify-center gap-3 shadow-[0_20px_40px_rgba(234,179,8,0.2)]"
+                >
+                  {(isPending || isConfirming) ? <Loader2 className="animate-spin" /> : <Zap size={28} />}
                   BUY TICKETS
                 </button>
               )}
             </div>
 
             <div className="md:w-64 space-y-6 pt-4 border-t md:border-t-0 md:border-l border-white/5 md:pl-12">
-               <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-500">Prize Logic</h4>
-               <div className="space-y-4">
-                  <PrizeMiniRow label="1st Place (50%)" value={formatUnits(splits.winners.first, 6)} color="text-yellow-500" />
-                  <PrizeMiniRow label="2nd Place (18%)" value={formatUnits(splits.winners.second, 6)} color="text-gray-300" />
-                  <PrizeMiniRow label="3rd Place (7%)" value={formatUnits(splits.winners.third, 6)} color="text-orange-500" />
-                  <div className="pt-4 border-t border-white/5">
-                    <PrizeMiniRow label="Shareholders" value={formatUnits(splits.platform.investors, 6)} color="text-purple-500" />
-                  </div>
-               </div>
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-500">Prize Logic</h4>
+              <div className="space-y-4">
+                <PrizeMiniRow label="1st Place (50%)" value={formatUnits(splits.winners.first, 6)} color="text-yellow-500" />
+                <PrizeMiniRow label="2nd Place (18%)" value={formatUnits(splits.winners.second, 6)} color="text-gray-300" />
+                <PrizeMiniRow label="3rd Place (7%)" value={formatUnits(splits.winners.third, 6)} color="text-orange-500" />
+                <div className="pt-4 border-t border-white/5">
+                  <PrizeMiniRow label="Shareholders" value={formatUnits(splits.platform.investors, 6)} color="text-purple-500" />
+                </div>
+              </div>
             </div>
           </div>
           <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 blur-[100px] rounded-full group-hover:bg-yellow-500/10 transition-colors" />
         </div>
 
         <div className="lg:col-span-4 flex flex-col gap-6">
-           <div className="bg-[#0d0d0d] border border-white/5 rounded-[2.5rem] p-8">
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-6">
-                <Activity className="text-green-500" size={16} /> Status
-              </h3>
-              <div className="space-y-4">
-                 <ActivityRow label="Network" value="Arbitrum One" />
-                 <ActivityRow label="Security" value="Chainlink VRF" />
-                 <ActivityRow label="Frequency" value="Every 30min" />
-              </div>
-           </div>
-           
-           <div className="flex-1 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-white/10 rounded-[2.5rem] p-8 flex flex-col justify-center items-center text-center">
-              <ShieldCheck className="text-blue-500 mb-4" size={40} />
-              <h4 className="text-lg font-black uppercase mb-2 leading-tight">Provably Fair</h4>
-              <p className="text-xs text-gray-500 mb-6">Todos os resultados são gerados on-chain com criptografia verificável.</p>
-              <a href={`https://arbiscan.io/address/${ADDRESSES.RAFFLE_MANAGER}`} target="_blank" className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">
-                 Verify Contract <ExternalLink size={12} />
-              </a>
-           </div>
+          <div className="bg-[#0d0d0d] border border-white/5 rounded-[2.5rem] p-8">
+            <h3 className="text-sm font-bold flex items-center gap-2 mb-6">
+              <Activity className="text-green-500" size={16} /> Status
+            </h3>
+            <div className="space-y-4">
+              <ActivityRow label="Network" value="Arbitrum One" />
+              <ActivityRow label="Security" value="Chainlink VRF" />
+              <ActivityRow label="Frequency" value="Every 30min" />
+            </div>
+          </div>
+
+          <div className="flex-1 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-white/10 rounded-[2.5rem] p-8 flex flex-col justify-center items-center text-center">
+            <ShieldCheck className="text-blue-500 mb-4" size={40} />
+            <h4 className="text-lg font-black uppercase mb-2 leading-tight">Provably Fair</h4>
+            <p className="text-xs text-gray-500 mb-6">Todos os resultados são gerados on-chain com criptografia verificável.</p>
+            
+              href={`https://arbiscan.io/address/${ADDRESSES.RAFFLE_MANAGER}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2"
+            >
+              Verify Contract <ExternalLink size={12} />
+            </a>
+          </div>
         </div>
       </section>
     </div>
   );
-
-  function handleApprove() {
-    if (!address) return;
-    writeContract({
-      address: ADDRESSES.USDC,
-      abi: ABIS.USDC,
-      functionName: 'approve',
-      args: [ADDRESSES.RAFFLE_MANAGER, BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")],
-      account: address,
-      chain: arbitrum,
-    });
-  }
-
-  function handleBuyTickets() {
-    if (!ticketAmount || parseInt(ticketAmount) <= 0 || !address) return;
-    writeContract({
-      address: ADDRESSES.RAFFLE_MANAGER,
-      abi: ABIS.RAFFLE_MANAGER,
-      functionName: 'buyTickets',
-      args: [BigInt(ticketAmount)],
-      account: address,
-      chain: arbitrum,
-    });
-  }
 };
-
-const PrizeMiniRow = ({ label, value, color }: { label: string; value: string; color: string }) => (
-  <div className="flex flex-col">
-    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">{label}</span>
-    <span className={`font-mono text-xs font-bold ${color}`}>{value} USDC</span>
-  </div>
-);
-
-const ActivityRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex justify-between items-center text-[10px] font-bold">
-    <span className="text-gray-500 uppercase tracking-widest">{label}</span>
-    <span className="text-gray-300">{value}</span>
-  </div>
-);
 
 export default RaffleView;
